@@ -1,3 +1,6 @@
+build:
+	cargo build --target x86_64-unknown-uefi
+
 run-uefi:
 	cargo build --target x86_64-unknown-uefi
 	mkdir -p mnt/EFI/BOOT
