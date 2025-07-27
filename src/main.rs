@@ -44,6 +44,7 @@ struct EfiBootServicesTable {
         interface: *mut *mut EfiVoid,
     ) -> EfiStatus,
 }
+const _: () = assert!(offset_of!(EfiBootServicesTable, locate_protocol) == 320);
 
 #[repr(C)]
 struct EfiSystemTable {
@@ -74,6 +75,7 @@ struct EfiGraphicsOutputProtocol<'a> {
     reserved: [u64; 3],
     pub mode: &'a EfiGraphicsOutputProtocolMode<'a>,
 }
+const _: () = assert!(offset_of!(EfiGraphicsOutputProtocol, mode) == 24);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -96,6 +98,7 @@ struct EfiGraphicsOutputProtocolPixelInfo {
     pub pixels_per_scan_line: u32,
 }
 const _: () = assert!(size_of::<EfiGraphicsOutputProtocolPixelInfo>() == 36);
+const _: () = assert!(offset_of!(EfiGraphicsOutputProtocolPixelInfo, pixels_per_scan_line) == 32);
 
 fn locate_graphic_protocol<'a>(
     efi_system_table: &EfiSystemTable,
@@ -118,5 +121,7 @@ use core::panic::PanicInfo;
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    loop {
+        unsafe { asm!("hlt") }
+    }
 }
