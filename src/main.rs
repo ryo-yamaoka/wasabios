@@ -2,10 +2,8 @@
 #![no_main]
 #![feature(offset_of)]
 
-#[cfg(not(test))]
 use core::panic::PanicInfo;
 
-#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {
@@ -42,6 +40,21 @@ fn efi_main(_image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
     fill_rect(&mut vram, 0x0000ff, 128, 128, 128, 128).expect("fill blue failed");
     for i in 0..256 {
         let _ = draw_point(&mut vram, 0x010101 * i as u32, i, i);
+    }
+
+    let grid_size: i64 = 32;
+    let rect_size: i64 = grid_size * 8;
+    for i in (0..=rect_size).step_by(grid_size as usize) {
+        let _ = draw_line(&mut vram, 0xff0000, 0, i, rect_size, i);
+        let _ = draw_line(&mut vram, 0xff0000, i, 0, i, rect_size);
+    }
+    let cx = rect_size / 2;
+    let cy = rect_size / 2;
+    for i in (0..=rect_size).step_by(grid_size as usize) {
+        let _ = draw_line(&mut vram, 0xffff00, cx, cy, 0, i);
+        let _ = draw_line(&mut vram, 0x00ffff, cx, cy, i, 0);
+        let _ = draw_line(&mut vram, 0xff00ff, cx, cy, rect_size, i);
+        let _ = draw_line(&mut vram, 0xffffff, cx, cy, i, rect_size);
     }
 
     loop {
@@ -146,9 +159,8 @@ trait Bitmap {
     fn height(&self) -> i64;
     fn buf_mut(&mut self) -> *mut u8;
     unsafe fn unchecked_pixel_at_mut(&mut self, x: i64, y: i64) -> *mut u32 {
-        let ptr = self.buf_mut() as usize;
         let offset = ((y * self.pixels_per_line() + x) * self.bytes_per_pixel()) as usize;
-        (ptr + offset) as *mut u32
+        self.buf_mut().add(offset) as *mut u32
     }
     fn pixel_at_mut(&mut self, x: i64, y: i64) -> Option<&mut u32> {
         if self.is_in_x_range(x) && self.is_in_y_range(y) {
@@ -197,7 +209,7 @@ fn fill_rect<T: Bitmap>(buf: &mut T, color: u32, px: i64, py: i64, w: i64, h: i6
         || !buf.is_in_x_range(px + w - 1)
         || !buf.is_in_y_range(py + h - 1)
     {
-        return Err("out of range");
+        return Err("out of fill rectangle range");
     }
 
     for x in px..px + w {
@@ -215,6 +227,45 @@ unsafe fn unchecked_draw_point<T: Bitmap>(buf: &mut T, color: u32, x: i64, y: i6
 }
 
 fn draw_point<T: Bitmap>(buf: &mut T, color: u32, x: i64, y: i64) -> Result<()> {
-    *(buf.pixel_at_mut(x, y).ok_or("out of range")?) = color;
+    *(buf.pixel_at_mut(x, y).ok_or("out of draw point range")?) = color;
+    Ok(())
+}
+
+fn calc_slope_point(da: i64, db: i64, ia: i64) -> Option<i64> {
+    if da < db {
+        None
+    } else if da == 0 {
+        Some(0)
+    } else if (0..=da).contains(&ia) {
+        Some((2 * db * ia + da) / da / 2)
+    } else {
+        None
+    }
+}
+
+fn draw_line<T: Bitmap>(buf: &mut T, color: u32, x0: i64, y0: i64, x1: i64, y1: i64) -> Result<()> {
+    if !buf.is_in_x_range(x0)
+        || !buf.is_in_x_range(x1)
+        || !buf.is_in_y_range(y0)
+        || !buf.is_in_y_range(y1)
+    {
+        return Err("out of draw line range");
+    }
+
+    let dx = (x1 - x0).abs();
+    let sx = (x1 - x0).signum();
+    let dy = (y1 - y0).abs();
+    let sy = (y1 - y0).signum();
+
+    if dx >= dy {
+        for (rx, ry) in (0..dx).flat_map(|rx| calc_slope_point(dx, dy, rx).map(|ry| (rx, ry))) {
+            draw_point(buf, color, x0 + rx * sx, y0 + ry * sy)?;
+        }
+    } else {
+        for (rx, ry) in (0..dy).flat_map(|ry| calc_slope_point(dy, dx, ry).map(|rx| (rx, ry))) {
+            draw_point(buf, color, x0 + rx * sx, y0 + ry * sy)?;
+        }
+    }
+
     Ok(())
 }
