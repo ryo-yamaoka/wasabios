@@ -1,3 +1,5 @@
 /target
 /mnt
 /bin
+/log/*
+!/log/.gitkeep
