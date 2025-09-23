@@ -12,6 +12,7 @@ use wasabi::graphics::Bitmap;
 use wasabi::info;
 use wasabi::init::init_basic_runtime;
 use wasabi::print;
+use wasabi::print::hexdump;
 use wasabi::println;
 use wasabi::qemu::exit_qemu;
 use wasabi::qemu::QemuExitCode;
@@ -29,6 +30,7 @@ fn efi_main(image_handle: EfiHandle, efi_system_table: &EfiSystemTable) {
     print!("Booting WasabiOS\n");
     println!("image_handle: {:#018X}", image_handle);
     println!("efi system table: {:#p}", efi_system_table);
+    hexdump(efi_system_table);
 
     info!("test info");
     warn!("test warn");
